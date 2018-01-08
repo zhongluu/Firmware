@@ -42,4 +42,3 @@ px4_add_module(
 		uorb_headers
 		uorb_msgs
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

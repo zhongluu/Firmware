@@ -110,79 +110,23 @@ endfunction()
 #	Set the posix build flags.
 #
 #	Usage:
-#		px4_os_add_flags(
-#			C_FLAGS <inout-variable>
-#			CXX_FLAGS <inout-variable>
-#			OPTIMIZATION_FLAGS <inout-variable>
-#			EXE_LINKER_FLAGS <inout-variable>
-#			INCLUDE_DIRS <inout-variable>
-#			LINK_DIRS <inout-variable>
-#			DEFINITIONS <inout-variable>)
-#
-#	Input:
-#		BOARD					: flags depend on board/posix config
-#
-#	Input/Output: (appends to existing variable)
-#		C_FLAGS					: c compile flags variable
-#		CXX_FLAGS				: c++ compile flags variable
-#		OPTIMIZATION_FLAGS			: optimization compile flags variable
-#		EXE_LINKER_FLAGS			: executable linker flags variable
-#		INCLUDE_DIRS				: include directories
-#		LINK_DIRS				: link directories
-#		DEFINITIONS				: definitions
-#
-#	Note that EXE_LINKER_FLAGS is not suitable for adding libraries because
-#	these flags are added before any of the object files and static libraries.
-#	Add libraries in src/firmware/posix/CMakeLists.txt.
-#
-#	Example:
-#		px4_os_add_flags(
-#			C_FLAGS CMAKE_C_FLAGS
-#			CXX_FLAGS CMAKE_CXX_FLAGS
-#			OPTIMIZATION_FLAGS optimization_flags
-#			EXE_LINKER_FLAG CMAKE_EXE_LINKER_FLAGS
-#			INCLUDES <list>)
+#		px4_os_add_flags()
 #
 function(px4_os_add_flags)
 
-	set(inout_vars
-		C_FLAGS CXX_FLAGS OPTIMIZATION_FLAGS EXE_LINKER_FLAGS INCLUDE_DIRS LINK_DIRS DEFINITIONS)
-
-	px4_parse_function_args(
-		NAME px4_os_add_flags
-		ONE_VALUE ${inout_vars} BOARD
-		REQUIRED ${inout_vars} BOARD
-		ARGN ${ARGN})
-
-	px4_add_common_flags(
-		BOARD ${BOARD}
-		C_FLAGS ${C_FLAGS}
-		CXX_FLAGS ${CXX_FLAGS}
-		OPTIMIZATION_FLAGS ${OPTIMIZATION_FLAGS}
-		EXE_LINKER_FLAGS ${EXE_LINKER_FLAGS}
-		INCLUDE_DIRS ${INCLUDE_DIRS}
-		LINK_DIRS ${LINK_DIRS}
-		DEFINITIONS ${DEFINITIONS})
-
-        set(added_include_dirs
-		src/modules/systemlib
-		src/platforms/posix/include
-		mavlink/include/mavlink
-		)
+	include_directories(src/platforms/posix/include)
 
 	# This block sets added_definitions and added_cxx_flags.
-	set(added_definitions
+	add_definitions(
 		-D__PX4_POSIX
 		-Dnoreturn_function=__attribute__\(\(noreturn\)\)
 		)
 
 	if(UNIX AND APPLE)
-		list(APPEND added_definitions
+		add_definitions(
 			-D__PX4_DARWIN
 			-D__DF_DARWIN
 			)
-
-		set(added_cxx_flags)
 
 		if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0)
 			message(FATAL_ERROR "PX4 Firmware requires XCode 8 or newer on Mac OS. Version installed on this system: ${CMAKE_CXX_COMPILER_VERSION}")
@@ -192,7 +136,7 @@ function(px4_os_add_flags)
 		STRING(REGEX MATCH "[0-9]+" DARWIN_VERSION ${DARWIN_VERSION})
 		# message(STATUS "PX4 Darwin Version: ${DARWIN_VERSION}")
 		if (DARWIN_VERSION LESS 16)
-			list(APPEND added_definitions
+			add_definitions(
 				-DCLOCK_MONOTONIC=1
 				-DCLOCK_REALTIME=0
 				-D__PX4_APPLE_LEGACY
@@ -200,7 +144,7 @@ function(px4_os_add_flags)
 		endif()
 
 	elseif(CYGWIN)
-		list(APPEND added_definitions
+		add_definitions(
 			-D__PX4_CYGWIN
 			-D_GNU_SOURCE
 			-D__USE_LINUX_IOCTL_DEFS
@@ -208,19 +152,12 @@ function(px4_os_add_flags)
 			)
 
 	else()
-		list(APPEND added_definitions
+		add_definitions(
 			-D__PX4_LINUX
 			-D__DF_LINUX
 			)
 
-		# Use -pthread For linux/g++.
-		set(added_cxx_flags
-			-pthread
-			)
-
 	endif()
-
-	set(added_exe_linker_flags)
 
 	# This block sets added_c_flags (appends to others).
 	if ("${BOARD}" STREQUAL "eagle")
@@ -232,18 +169,14 @@ function(px4_os_add_flags)
 		endif()
 
 		# Add the toolchain specific flags
-		set(added_c_flags ${POSIX_CMAKE_C_FLAGS} --sysroot=${HEXAGON_ARM_SYSROOT})
-
-		list(APPEND added_cxx_flags
-			${POSIX_CMAKE_CXX_FLAGS}
-			--sysroot=${HEXAGON_ARM_SYSROOT}
-			)
+		add_compile_options(--sysroot=${HEXAGON_ARM_SYSROOT})
 
 		list(APPEND added_exe_linker_flags
 			-Wl,-rpath-link,${HEXAGON_ARM_SYSROOT}/usr/lib
 			-Wl,-rpath-link,${HEXAGON_ARM_SYSROOT}/lib
 			--sysroot=${HEXAGON_ARM_SYSROOT}
 			)
+
 	# This block sets added_c_flags (appends to others).
 	elseif ("${BOARD}" STREQUAL "excelsior")
 
@@ -254,20 +187,17 @@ function(px4_os_add_flags)
 		endif()
 
 		# Add the toolchain specific flags
-
-		set(added_c_flags ${POSIX_CMAKE_C_FLAGS} --sysroot=${HEXAGON_ARM_SYSROOT}/lib32-apq8096  -mfloat-abi=softfp -mfpu=neon -mthumb-interwork)
+		add_compile_options(--sysroot=${HEXAGON_ARM_SYSROOT}/lib32-apq8096 -mfloat-abi=softfp -mfpu=neon -mthumb-interwork)
 
 		list(APPEND added_cxx_flags
-			${POSIX_CMAKE_CXX_FLAGS}
-			--sysroot=${HEXAGON_ARM_SYSROOT}/lib32-apq8096  -mfloat-abi=softfp -mfpu=neon -mthumb-interwork
-
+			--sysroot=${HEXAGON_ARM_SYSROOT}/lib32-apq8096 -mfloat-abi=softfp -mfpu=neon -mthumb-interwork
 			)
 
 		list(APPEND added_exe_linker_flags
 			-Wl,-rpath-link,${HEXAGON_ARM_SYSROOT}/lib32-apq8096/usr/lib
 			-Wl,-rpath-link,${HEXAGON_ARM_SYSROOT}/lib32-apq8096/lib
 
-			--sysroot=${HEXAGON_ARM_SYSROOT}/lib32-apq8096  -mfloat-abi=softfp -mfpu=neon -mthumb-interwork
+			--sysroot=${HEXAGON_ARM_SYSROOT}/lib32-apq8096 -mfloat-abi=softfp -mfpu=neon -mthumb-interwork
 
 			)
 	elseif ("${BOARD}" STREQUAL "rpi")
@@ -301,13 +231,6 @@ function(px4_os_add_flags)
 		ENDIF()
 	endif()
 
-	# output
-	foreach(var ${inout_vars})
-		string(TOLOWER ${var} lower_var)
-		#message(STATUS "posix: set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)")
-		set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)
-	endforeach()
-
 endfunction()
 
 #=============================================================================
@@ -319,24 +242,22 @@ endfunction()
 #	Usage:
 #		px4_os_prebuild_targets(
 #			OUT <out-list_of_targets>
-#			BOARD <in-string>
 #			)
 #
 #	Input:
 #		BOARD 		: board
-#		THREADS 	: number of threads for building
 #
 #	Output:
 #		OUT	: the target list
 #
 #	Example:
-#		px4_os_prebuild_targets(OUT target_list BOARD px4fmu-v2)
+#		px4_os_prebuild_targets(OUT target_list)
 #
 function(px4_os_prebuild_targets)
 	px4_parse_function_args(
 			NAME px4_os_prebuild_targets
-			ONE_VALUE OUT BOARD THREADS
-			REQUIRED OUT BOARD
+			ONE_VALUE OUT
+			REQUIRED OUT
 			ARGN ${ARGN})
 
 	add_custom_target(${OUT} DEPENDS uorb_headers)

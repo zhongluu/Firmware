@@ -270,49 +270,13 @@ endfunction()
 #	Set the default build flags.
 #
 #	Usage:
-#		px4_add_common_flags(
-#			BOARD <in-string>
-#			C_FLAGS <inout-variable>
-#			CXX_FLAGS <inout-variable>
-#			OPTIMIZATION_FLAGS <inout-variable>
-#			EXE_LINKER_FLAGS <inout-variable>
-#			INCLUDE_DIRS <inout-variable>
-#			LINK_DIRS <inout-variable>
-#			DEFINITIONS <inout-variable>)
+#		px4_add_common_flags()
 #
-#	Input:
-#		BOARD					: board
 #
-#	Input/Output: (appends to existing variable)
-#		C_FLAGS					: c compile flags variable
-#		CXX_FLAGS				: c++ compile flags variable
-#		OPTIMIZATION_FLAGS			: optimization compile flags variable
-#		EXE_LINKER_FLAGS			: executable linker flags variable
-#		INCLUDE_DIRS				: include directories
-#		LINK_DIRS				: link directories
-#		DEFINITIONS				: definitions
-#
-#	Example:
-#		px4_add_common_flags(
-#			BOARD px4fmu-v2
-#			C_FLAGS CMAKE_C_FLAGS
-#			CXX_FLAGS CMAKE_CXX_FLAGS
-#			OPTIMIZATION_FLAGS optimization_flags
-#			EXE_LINKER_FLAG CMAKE_EXE_LINKER_FLAGS
-#			INCLUDES <list>)
 #
 function(px4_add_common_flags)
 
-	set(inout_vars
-		C_FLAGS CXX_FLAGS OPTIMIZATION_FLAGS EXE_LINKER_FLAGS INCLUDE_DIRS LINK_DIRS DEFINITIONS)
-
-	px4_parse_function_args(
-		NAME px4_add_common_flags
-		ONE_VALUE ${inout_vars} BOARD
-		REQUIRED ${inout_vars} BOARD
-		ARGN ${ARGN})
-
-	set(warnings
+	add_compile_options(
 		-Wall
 		-Warray-bounds
 		-Wdisabled-optimization
@@ -332,13 +296,25 @@ function(px4_add_common_flags)
 		-Wunknown-pragmas
 		-Wunused-variable
 
+		-Wno-missing-field-initializers
+
 		-Wno-unused-parameter
+
+		-fvisibility=hidden
+		-include visibility.h
+		-fno-strict-aliasing
+		-fomit-frame-pointer
+		-funsafe-math-optimizations
+		-ffunction-sections
+		-fdata-sections
+
+		-g
 		)
 
 	if (${CMAKE_C_COMPILER_ID} MATCHES ".*Clang.*")
 		# QuRT 6.4.X compiler identifies as Clang but does not support this option
 		if (NOT ${OS} STREQUAL "qurt")
-			list(APPEND warnings
+			add_compile_options(
 				-Qunused-arguments
 				-Wno-unused-const-variable
 				-Wno-varargs
@@ -349,58 +325,51 @@ function(px4_add_common_flags)
 			)
 		endif()
 	else()
-		list(APPEND warnings
+		add_compile_options(
 			-Wunused-but-set-variable
 			-Wformat=1
 			-Wdouble-promotion
 		)
 	endif()
 
-	set(_optimization_flags
-		-fno-strict-aliasing
-		-fomit-frame-pointer
-		-funsafe-math-optimizations
-		-ffunction-sections
-		-fdata-sections
-		)
+	set(c_compile_flags
+		-std=gnu99
 
-	set(c_warnings
+		-fno-common
+
 		-Wbad-function-cast
 		-Wstrict-prototypes
 		-Wmissing-prototypes
 		-Wnested-externs
 		)
 
-	set(c_compile_flags
-		-g
-		-std=gnu99
-		-fno-common
-		)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${c_compile_flags}")
 
-	set(cxx_warnings
+	set(cxx_compile_flags
+		-fno-exceptions
+		-fno-rtti
+		-fno-threadsafe-statics
+
+		-std=gnu++11
+
+		-DCONFIG_WCHAR_BUILTIN
+		-D__CUSTOM_FILE_IO__
+
 		-Wno-missing-field-initializers
 		-Wno-overloaded-virtual # TODO: fix and remove
 		-Wreorder
 		)
 
-	set(cxx_compile_flags
-		-g
-		-fno-exceptions
-		-fno-rtti
-		-std=gnu++11
-		-fno-threadsafe-statics
-		-DCONFIG_WCHAR_BUILTIN
-		-D__CUSTOM_FILE_IO__
-		)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cxx_compile_flags}")
 
 	# regular Clang or AppleClang
 	if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		# force color for clang (needed for clang + ccache)
-		list(APPEND _optimization_flags
+		add_compile_options(
 			-fcolor-diagnostics
 		)
 	else()
-		list(APPEND _optimization_flags
+		add_compile_options(
 			-fno-strength-reduce
 			-fno-builtin-printf
 		)
@@ -408,7 +377,7 @@ function(px4_add_common_flags)
 		# -fcheck-new is a no-op for Clang in general
 		# and has no effect, but can generate a compile
 		# error for some OS
-		list(APPEND cxx_compile_flags
+		add_compile_options(
 			-fcheck-new
 		)
 	endif()
@@ -416,39 +385,15 @@ function(px4_add_common_flags)
 	if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.9)
 			# force color for gcc > 4.9
-			list(APPEND _optimization_flags
-				-fdiagnostics-color=always
-			)
+			add_compile_options(-fdiagnostics-color=always)
 		endif()
 	endif()
 
-	set(visibility_flags
-		-fvisibility=hidden
-		-include visibility.h
-		)
-
-	set(added_c_flags
-		${c_compile_flags}
-		${warnings}
-		${c_warnings}
-		${visibility_flags}
-		)
-
-	set(added_cxx_flags
-		${cxx_compile_flags}
-		${warnings}
-		${cxx_warnings}
-		${visibility_flags}
-		)
-
-	set(added_optimization_flags
-		${_optimization_flags}
-		)
-
-	set(added_include_dirs
+	include_directories(
 		${PX4_BINARY_DIR}
 		${PX4_BINARY_DIR}/src
 		${PX4_BINARY_DIR}/src/modules
+
 		${PX4_SOURCE_DIR}/src
 		${PX4_SOURCE_DIR}/src/drivers/boards/${BOARD}
 		${PX4_SOURCE_DIR}/src/include
@@ -459,23 +404,13 @@ function(px4_add_common_flags)
 		${PX4_SOURCE_DIR}/src/platforms
 		)
 
-	set(added_link_dirs) # none used currently
-	set(added_exe_linker_flags)
-
 	string(TOUPPER ${BOARD} board_upper)
 	string(REPLACE "-" "_" board_config ${board_upper})
 
-	set(added_definitions
+	add_definitions(
 		-DCONFIG_ARCH_BOARD_${board_config}
 		-D__STDC_FORMAT_MACROS
 		)
-
-	# output
-	foreach(var ${inout_vars})
-		string(TOLOWER ${var} lower_var)
-		set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)
-		#message(STATUS "set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)")
-	endforeach()
 
 endfunction()
 
