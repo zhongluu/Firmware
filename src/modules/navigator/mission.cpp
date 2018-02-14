@@ -1022,14 +1022,22 @@ Mission::heading_sp_update()
 			/* stop if positions are close together to prevent excessive yawing */
 			if (d_current > _navigator->get_acceptance_radius()) {
 				float yaw = get_bearing_to_next_waypoint(
-						    point_from_latlon[0],
-						    point_from_latlon[1],
-						    point_to_latlon[0],
-						    point_to_latlon[1]);
+						    point_from_latlon[0], point_from_latlon[1],
+						    point_to_latlon[0], point_to_latlon[1]);
 
 				/* always keep the back of the rotary wing pointing towards home */
 				if (_param_yawmode.get() == MISSION_YAWMODE_BACK_TO_HOME) {
 					_mission_item.yaw = _wrap_pi(yaw + M_PI_F);
+					pos_sp_triplet->current.yaw = _mission_item.yaw;
+
+				} else if ((_param_yawmode.get() == MISSION_YAWMODE_FRONT_TO_WAYPOINT)
+					   && (_navigator->get_vroi().mode == vehicle_roi_s::ROI_WPNEXT)
+					   && !_param_mnt_yaw_ctl.get()) {
+
+					/* if yaw control for the mount is disabled and we have a valid ROI that points to the next
+					 * waypoint, we add the gimbal's yaw offset to the vehicle's yaw */
+					yaw += _navigator->get_vroi().yaw_offset;
+					_mission_item.yaw = yaw;
 					pos_sp_triplet->current.yaw = _mission_item.yaw;
 
 				} else {
