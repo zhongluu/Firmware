@@ -13,6 +13,8 @@ set(config_module_list
 	drivers/imu/mpu9250
 	drivers/barometer/lps25h
 	drivers/gps
+	drivers/distance_sensor/vl53lxx
+	drivers/pmw3901
 	modules/sensors
 
 	#
@@ -32,6 +34,7 @@ set(config_module_list
 	systemcmds/dumpfile
 	systemcmds/ver
 	systemcmds/hardfault_log
+	systemcmds/topic_listener
 
 	#
 	# General system control
