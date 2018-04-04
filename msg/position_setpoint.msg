@@ -39,7 +39,6 @@ bool yawspeed_valid		# true if yawspeed setpoint valid
 
 float32 loiter_radius		# loiter radius (only for fixed wing), in m
 int8 loiter_direction		# loiter direction: 1 = CW, -1 = CCW
-float32 pitch_min		# minimal pitch angle for fixed wing takeoff waypoints
 
 float32 a_x			# acceleration x setpoint
 float32 a_y			# acceleration y setpoint

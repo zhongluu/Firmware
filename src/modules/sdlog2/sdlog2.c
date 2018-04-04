@@ -1807,7 +1807,6 @@ int sdlog2_thread_main(int argc, char *argv[])
 					log_msg.body.log_GPSP.type = buf.triplet.current.type;
 					log_msg.body.log_GPSP.loiter_radius = buf.triplet.current.loiter_radius;
 					log_msg.body.log_GPSP.loiter_direction = buf.triplet.current.loiter_direction;
-					log_msg.body.log_GPSP.pitch_min = buf.triplet.current.pitch_min;
 					LOGBUFFER_WRITE_AND_COUNT(GPSP);
 				}
 			}

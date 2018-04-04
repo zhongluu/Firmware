@@ -554,11 +554,6 @@ Mission::set_mission_items()
 			_mission_item.nav_cmd = NAV_CMD_WAYPOINT;
 			/* ignore yaw here, otherwise it might yaw before heading_sp_update takes over */
 			_mission_item.yaw = NAN;
-			/* since _mission_item.time_inside and and _mission_item.pitch_min build a union, we need to set time_inside to zero
-			 * since in NAV_CMD_TAKEOFF mode there is currently no time_inside.
-			 * Note also that resetting time_inside to zero will cause pitch_min to be zero as well.
-			 */
-			_mission_item.time_inside = 0.0f;
 
 		} else if (_mission_item.nav_cmd == NAV_CMD_VTOL_TAKEOFF
 			   && _work_item_type == WORK_ITEM_TYPE_DEFAULT
@@ -585,10 +580,6 @@ Mission::set_mission_items()
 			_mission_item.nav_cmd = NAV_CMD_WAYPOINT;
 			/* ignore yaw here, otherwise it might yaw before heading_sp_update takes over */
 			_mission_item.yaw = NAN;
-			/* since _mission_item.time_inside and and _mission_item.pitch_min build a union, we need to set time_inside to zero
-			 * since in NAV_CMD_TAKEOFF mode there is currently no time_inside.
-			 */
-			_mission_item.time_inside = 0.0f;
 		}
 
 		/* if we just did a VTOL takeoff, prepare transition */
