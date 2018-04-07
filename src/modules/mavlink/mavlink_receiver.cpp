@@ -126,6 +126,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_vision_position_pub(nullptr),
 	_vision_attitude_pub(nullptr),
 	_telemetry_status_pub(nullptr),
+	_ping_pub(nullptr),
 	_rc_pub(nullptr),
 	_manual_pub(nullptr),
 	_obstacle_distance_pub(nullptr),
@@ -1372,6 +1373,59 @@ MavlinkReceiver::handle_message_radio_status(mavlink_message_t *msg)
 }
 
 void
+MavlinkReceiver::handle_message_ping(mavlink_message_t *msg)
+{
+	mavlink_ping_t ping;
+	mavlink_msg_ping_decode(msg, &ping);
+
+	if ((ping.target_system == 0) &&
+	    (ping.target_component == 0)) {	   // This is a ping request. Return it to the system which requested the ping.
+
+		ping.target_system = msg->sysid;
+		ping.target_component = msg->compid;
+		mavlink_msg_ping_send_struct(_mavlink->get_channel(), &ping);
+
+	} else if ((ping.target_system == mavlink_system.sysid) &&
+		   (ping.target_component ==
+		    mavlink_system.compid)) {	// This is a returned ping message from this system. Calculate latency from it.
+
+		double rtt_ms = hrt_absolute_time() - ping.time_usec / 1000.0;
+
+		/* Ping status is supported only on first ORB_MULTI_MAX_INSTANCES mavlink channels */
+		if (_mavlink->get_channel() < (mavlink_channel_t)ORB_MULTI_MAX_INSTANCES) {
+
+			struct ping_s png = {};
+
+			png.timestamp = hrt_absolute_time();
+			png.ping_time = ping.time_usec;
+			png.ping_sequence = ping.seq;
+			png.rtt_ms = (float)rtt_ms;
+			png.system_id = msg->sysid;
+			png.component_id = msg->compid;
+
+			if (_ping_pub == nullptr) {
+				int multi_instance;
+				_ping_pub = orb_advertise_multi(ORB_ID(ping), &png, &multi_instance, ORB_PRIO_DEFAULT);
+
+			} else {
+				orb_publish(ORB_ID(ping), _ping_pub, &png);
+			}
+		}
+
+		// Update ping statistics
+		struct Mavlink::ping_statistics &pstats = _mavlink->get_ping_statistics();
+
+		pstats.last_ping_time = hrt_absolute_time();
+		pstats.dropped_packets += (ping.seq - pstats.last_ping_seq - 1);
+		pstats.last_ping_seq = ping.seq;
+		pstats.last_rtt = (float)rtt_ms;
+		pstats.mean_rtt = ((float)rtt_ms + pstats.mean_rtt) / 2.0f;
+		pstats.max_rtt = fmaxf((float)rtt_ms, pstats.max_rtt);
+		pstats.min_rtt = fminf((float)rtt_ms, pstats.min_rtt);
+	}
+}
+
+void
 MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 {
 	// external battery measurements
@@ -1712,18 +1766,6 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 				orb_publish(ORB_ID(telemetry_status), _telemetry_status_pub, &tstatus);
 			}
 		}
-	}
-}
-
-void
-MavlinkReceiver::handle_message_ping(mavlink_message_t *msg)
-{
-	mavlink_ping_t ping;
-	mavlink_msg_ping_decode(msg, &ping);
-
-	if ((mavlink_system.sysid == ping.target_system) &&
-	    (mavlink_system.compid == ping.target_component)) {
-		mavlink_msg_ping_send_struct(_mavlink->get_channel(), &ping);
 	}
 }
 

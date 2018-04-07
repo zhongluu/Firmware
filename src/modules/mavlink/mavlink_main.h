@@ -480,6 +480,21 @@ public:
 
 	bool ftp_enabled() const { return _ftp_on; }
 
+	struct ping_statistics {
+		uint64_t last_ping_time;
+		uint32_t last_ping_seq;
+		uint32_t dropped_packets;
+		float last_rtt;
+		float mean_rtt;
+		float max_rtt;
+		float min_rtt;
+	};
+
+	/**
+	 * Get the ping statistics of this MAVLink link
+	 */
+	struct ping_statistics	&get_ping_statistics() { return _ping_stats; }
+
 protected:
 	Mavlink			*next;
 
@@ -580,6 +595,8 @@ private:
 	unsigned short _remote_port;
 
 	struct telemetry_status_s	_rstatus;			///< receive status
+
+	ping_statistics	_ping_stats;					///< ping statistics
 
 	struct mavlink_message_buffer {
 		int write_ptr;
