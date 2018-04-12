@@ -300,7 +300,7 @@ void Tailsitter::fill_actuator_outputs()
 
 	_actuators_out_1->timestamp = _actuators_mc_in->timestamp;
 
-	if (_params->elevons_mc_lock) {
+	if (_params->elevons_mc_lock && _vtol_schedule.flight_mode == MC_MODE) {
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = 0;
 		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = 0;
 
