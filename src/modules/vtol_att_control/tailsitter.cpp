@@ -186,14 +186,24 @@ void Tailsitter::update_transition_state()
 		_flag_was_in_trans_mode = true;
 
 		if (_vtol_schedule.flight_mode == TRANSITION_BACK) {
+			// calculate rotation axis for transition.
 			_q_trans_start = matrix::Quatf(_v_att->q);
-			matrix::Vector3f z = matrix::Dcmf(_q_trans_start) * matrix::Vector3f(0, 0, -1);
+			matrix::Vector3f z = -_q_trans_start.dcm_z();
 			_trans_rot_axis = z.cross(matrix::Vector3f(0, 0, -1));
+
+			// as heading setpoint we choose the heading given by the direction the vehicle points
 			float yaw_sp = atan2f(z(1), z(0));
+
+			// the intial attitude setpoint for a backtransition is a combination of the current fw pitch setpoint,
+			// the yaw setpoint and zero roll since we want wings level transition
 			_q_trans_start = matrix::Eulerf(0.0f, _fw_virtual_att_sp->pitch_body, yaw_sp);
+
+			// attitude during transitions are controlled by mc attitude control so rotate the desired attitude to the
+			// multirotor frame
 			_q_trans_start = _q_trans_start * matrix::Quatf(matrix::Eulerf(0, -M_PI_2_F, 0));
 
 		} else if (_vtol_schedule.flight_mode == TRANSITION_FRONT_P1) {
+			// initial attitude setpoint for the transition should be with wings level
 			_q_trans_start = matrix::Eulerf(0.0f, _mc_virtual_att_sp->pitch_body, _mc_virtual_att_sp->yaw_body);
 			matrix::Vector3f x = matrix::Dcmf(matrix::Quatf(_v_att->q)) * matrix::Vector3f(1, 0, 0);
 			_trans_rot_axis = -x.cross(matrix::Vector3f(0, 0, -1));
@@ -202,23 +212,30 @@ void Tailsitter::update_transition_state()
 		_q_trans_sp = _q_trans_start;
 	}
 
+	// tilt angle (zero if vehicle nose points up (hover))
+	float tilt = acosf(_q_trans_sp(0) * _q_trans_sp(0) - _q_trans_sp(1) * _q_trans_sp(1) - _q_trans_sp(2) * _q_trans_sp(
+				   2) + _q_trans_sp(3) * _q_trans_sp(3));
+
 	if (_vtol_schedule.flight_mode == TRANSITION_FRONT_P1) {
 
-		float tilt = acosf(_q_trans_sp(0) * _q_trans_sp(0) - _q_trans_sp(1) * _q_trans_sp(1) - _q_trans_sp(2) * _q_trans_sp(
-					   2) + _q_trans_sp(3) * _q_trans_sp(3));
+		const float trans_pitch_rate = M_PI_2_F / _params->front_trans_duration;
 
 		if (tilt < M_PI_2_F - _params_tailsitter.fw_pitch_sp_offset) {
-			_q_trans_sp = matrix::Quatf(matrix::AxisAnglef(_trans_rot_axis, time_since_trans_start * 1.0f)) * _q_trans_start;
+			_q_trans_sp = matrix::Quatf(matrix::AxisAnglef(_trans_rot_axis,
+						    time_since_trans_start * trans_pitch_rate)) * _q_trans_start;
 		}
 
 	} else if (_vtol_schedule.flight_mode == TRANSITION_BACK) {
+
+		const float trans_pitch_rate = M_PI_2_F / _params->back_trans_duration;
 
 		if (!flag_idle_mc) {
 			flag_idle_mc = set_idle_mc();
 		}
 
-		if (_q_trans_sp(1) * _q_trans_sp(1) + _q_trans_sp(2) * _q_trans_sp(2) > 0.01f) {
-			_q_trans_sp = matrix::Quatf(matrix::AxisAnglef(_trans_rot_axis, time_since_trans_start * 0.7f)) * _q_trans_start;
+		if (tilt > 0.01f) {
+			_q_trans_sp = matrix::Quatf(matrix::AxisAnglef(_trans_rot_axis,
+						    time_since_trans_start * trans_pitch_rate)) * _q_trans_start;
 		}
 	}
 
