@@ -75,7 +75,6 @@ pipeline {
             builds[node_name] = createBuildNode(docker_nuttx, "${node_name}_default")
           }
 
-          builds["sitl"] = createBuildNode(docker_base, 'posix_sitl_default')
           builds["sitl_rtps"] = createBuildNode(docker_base, 'posix_sitl_rtps')
           builds["sitl (GCC 7)"] = createBuildNode(docker_arch, 'posix_sitl_default')
 
@@ -87,6 +86,27 @@ pipeline {
           // snapdragon (eagle_default)
           builds["eagle (linux)"] = createBuildNodeDockerLogin(docker_snapdragon, 'docker_hub_dagar', 'posix_eagle_default')
           builds["eagle (qurt)"] = createBuildNodeDockerLogin(docker_snapdragon, 'docker_hub_dagar', 'qurt_eagle_default')
+
+          // posix_sitl_default with package
+          builds["sitl"] = {
+            node {
+              stage("Build Test sitl") {
+                docker.image(docker_base).inside('-e CCACHE_BASEDIR=$WORKSPACE -v ${CCACHE_DIR}:${CCACHE_DIR}:rw') {
+                  stage("sitl") {
+                    checkout scm
+                    sh "export"
+                    sh "make distclean"
+                    sh "ccache -z"
+                    sh "make posix_sitl_default"
+                    sh "ccache -s"
+                    sh "make posix_sitl_default package"
+                    stash name: "px4_sitl_package", includes: "build/**/*.zip"
+                    sh "make distclean"
+                  }
+                }
+              }
+            }
+          }
 
           // MAC OS posix_sitl_default
           builds["sitl (OSX)"] = {
