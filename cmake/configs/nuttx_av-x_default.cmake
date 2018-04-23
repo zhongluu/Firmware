@@ -21,6 +21,7 @@ set(config_module_list
 	drivers/gps
 	drivers/imu/adis16477
 	drivers/imu/adis16497
+	drivers/imu/lsm303agr
 	drivers/irlock
 	drivers/mkblctrl
 	drivers/pwm_out_sim
